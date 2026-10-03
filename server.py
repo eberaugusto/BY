@@ -31,7 +31,7 @@ def avancar_turno():
 
     estado_jogo["turno_fim_tempo"] = time.time() + 90
     estado_jogo["acoes_restantes"] = 1
-    sio.emit("estado_atualizado", estado_jogo)
+    sio.emit("estado_atualizado", estado_jogo, room='sala_principal')
 
 def loop_tempo_turno():
     while True:
@@ -45,6 +45,8 @@ eventlet.spawn(loop_tempo_turno)
 @sio.event
 def connect(sid, environ):
     print(f"\n[SUCESSO] >>> Jogador conectado! SID: {sid}\n")
+    # Insere automaticamente o cliente na sala unificada da partida
+    sio.enter_room(sid, 'sala_principal')
 
 @sio.event
 def disconnect(sid):
@@ -55,8 +57,8 @@ def disconnect(sid):
             estado_jogo["ordem_turnos"].remove(sid)
         if len(estado_jogo["jogadores"]) < 1:
             estado_jogo["partida_iniciada"] = False
-        sio.emit("estado_atualizado", estado_jogo)
-        sio.emit("atualizar_lobby", list(estado_jogo["jogadores"].values()))
+        sio.emit("estado_atualizado", estado_jogo, room='sala_principal')
+        sio.emit("atualizar_lobby", list(estado_jogo["jogadores"].values()), room='sala_principal')
 
 @sio.event
 def entrar_lobby(sid, data):
@@ -82,7 +84,8 @@ def entrar_lobby(sid, data):
     if sid not in estado_jogo["ordem_turnos"]:
         estado_jogo["ordem_turnos"].append(sid)
     
-    sio.emit("atualizar_lobby", list(estado_jogo["jogadores"].values()))
+    # Envia os dados atualizados para todos dentro da mesma sala principal
+    sio.emit("atualizar_lobby", list(estado_jogo["jogadores"].values()), room='sala_principal')
 
 @sio.event
 def iniciar_partida(sid):
@@ -90,7 +93,7 @@ def iniciar_partida(sid):
         estado_jogo["partida_iniciada"] = True
         estado_jogo["turno_idx"] = -1
         avancar_turno()
-        sio.emit("jogo_comecou")
+        sio.emit("jogo_comecou", room='sala_principal')
 
 @sio.event
 def comprar_carta(sid):
@@ -106,7 +109,7 @@ def comprar_carta(sid):
     if estado_jogo["acoes_restantes"] <= 0:
         avancar_turno()
     else:
-        sio.emit("estado_atualizado", estado_jogo)
+        sio.emit("estado_atualizado", estado_jogo, room='sala_principal')
 
 @sio.event
 def jogar_carta(sid, data):
@@ -138,7 +141,7 @@ def jogar_carta(sid, data):
     if estado_jogo["acoes_restantes"] <= 0:
         avancar_turno()
     else:
-        sio.emit("estado_atualizado", estado_jogo)
+        sio.emit("estado_atualizado", estado_jogo, room='sala_principal')
 
 @sio.event
 def passar_vez(sid):
