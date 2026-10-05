@@ -71,41 +71,46 @@ def disconnect(sid):
 
 @sio.event
 def entrar_lobby(sid, data):
-    # Verifica se a partida já começou
     if estado_jogo["partida_iniciada"]:
         sio.emit("partida_em_andamento", to=sid)
-        return
-
-    # Validação do limite de 5 jogadores
+        return {"ok": False, "erro": "partida_em_andamento"}
     if len(estado_jogo["jogadores"]) >= 5 and sid not in estado_jogo["jogadores"]:
-        print(f"⚠️ Tentativa de entrada rejeitada (Lobby cheio): {sid}")
         sio.emit("lobby_cheio", to=sid)
-        return
-
+        return {"ok": False, "erro": "lobby_cheio"}
     estado_jogo["jogadores"][sid] = {
-        "sid": sid,
-        "nome": data["nome"],
-        "yordle": data["yordle"],
-        "vida_atual": data["hp"],
-        "vida_maxima": data["hp_max"],
-        "ataque": data["atq"],
-        "cartas_qtd": data["cartas_qtd"]
+        "sid": sid, "nome": data["nome"], "yordle": data["yordle"],
+        "vida_atual": data["hp"], "vida_maxima": data["hp_max"],
+        "ataque": data["atq"], "cartas_qtd": data["cartas_qtd"]
     }
     if sid not in estado_jogo["ordem_turnos"]:
         estado_jogo["ordem_turnos"].append(sid)
-    
-    # Esta é a lista oficial do lobby; todos recebem exatamente a mesma versão.
     jogadores_lobby = list(estado_jogo["jogadores"].values())
-    sio.emit("atualizar_lobby", jogadores_lobby, room='sala_principal')
+    sio.emit("atualizar_lobby", jogadores_lobby, room="sala_principal")
     sio.emit("entrada_confirmada", {"sid": sid}, to=sid)
+    return {"ok": True, "sid": sid, "jogadores": jogadores_lobby}
+
+@sio.event
+def sair_lobby(sid):
+    if estado_jogo["partida_iniciada"]:
+        return {"ok": False}
+    estado_jogo["jogadores"].pop(sid, None)
+    if sid in estado_jogo["ordem_turnos"]:
+        estado_jogo["ordem_turnos"].remove(sid)
+    jogadores_lobby = list(estado_jogo["jogadores"].values())
+    sio.emit("atualizar_lobby", jogadores_lobby, room="sala_principal")
+    return {"ok": True}
 
 @sio.event
 def iniciar_partida(sid):
-    if len(estado_jogo["jogadores"]) >= 1 and not estado_jogo["partida_iniciada"]:
+    if sid not in estado_jogo["jogadores"]:
+        return {"ok": False, "erro": "jogador_nao_esta_no_lobby"}
+    if estado_jogo["jogadores"] and not estado_jogo["partida_iniciada"]:
         estado_jogo["partida_iniciada"] = True
         estado_jogo["turno_idx"] = -1
         avancar_turno()
-        sio.emit("jogo_comecou", room='sala_principal')
+        sio.emit("jogo_comecou", room="sala_principal")
+        return {"ok": True}
+    return {"ok": False, "erro": "partida_ja_iniciada"}
 
 @sio.event
 def comprar_carta(sid):
