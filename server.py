@@ -79,10 +79,11 @@ def disconnect(sid):
 def entrar_lobby(sid, data):
     if estado_jogo["partida_iniciada"]:
         sio.emit("partida_em_andamento", to=sid)
-        return {"ok": False, "erro": "partida_em_andamento"}
+        return
     if len(estado_jogo["jogadores"]) >= 5 and sid not in estado_jogo["jogadores"]:
         sio.emit("lobby_cheio", to=sid)
-        return {"ok": False, "erro": "lobby_cheio"}
+        return
+
     estado_jogo["jogadores"][sid] = {
         "sid": sid, "nome": data["nome"], "yordle": data["yordle"],
         "vida_atual": data["hp"], "vida_maxima": data["hp_max"],
@@ -90,14 +91,16 @@ def entrar_lobby(sid, data):
     }
     if sid not in estado_jogo["ordem_turnos"]:
         estado_jogo["ordem_turnos"].append(sid)
+
     jogadores_lobby = list(estado_jogo["jogadores"].values())
+    print(f"[LOBBY] PROCESSO {SERVER_PROCESS_ID} | {data['nome']} entrou | TOTAL {len(jogadores_lobby)} | {[p['nome'] for p in jogadores_lobby]}", flush=True)
     sio.emit("atualizar_lobby", jogadores_lobby, room="sala_principal")
-    sio.emit("entrada_confirmada", {"sid": sid}, to=sid)
-    return {
-        "ok": True, "sid": sid, "jogadores": jogadores_lobby,
+    sio.emit("entrada_confirmada", {
+        "sid": sid,
         "server_process_id": SERVER_PROCESS_ID,
-        "server_player_count": len(estado_jogo["jogadores"])
-    }
+        "server_player_count": len(jogadores_lobby),
+        "jogadores": jogadores_lobby
+    }, to=sid)
 
 @sio.event
 def sair_lobby(sid):
