@@ -45,8 +45,17 @@ eventlet.spawn(loop_tempo_turno)
 @sio.event
 def connect(sid, environ):
     print(f"\n[SUCESSO] >>> Jogador conectado! SID: {sid}\n")
-    # Insere automaticamente o cliente na sala unificada da partida
     sio.enter_room(sid, 'sala_principal')
+
+    # O servidor informa ao cliente qual é sua identidade real no multiplayer.
+    sio.emit("identidade", {"sid": sid}, to=sid)
+
+    # Um cliente recém-conectado recebe imediatamente o lobby oficial atual.
+    sio.emit(
+        "atualizar_lobby",
+        list(estado_jogo["jogadores"].values()),
+        to=sid
+    )
 
 @sio.event
 def disconnect(sid):
@@ -64,6 +73,7 @@ def disconnect(sid):
 def entrar_lobby(sid, data):
     # Verifica se a partida já começou
     if estado_jogo["partida_iniciada"]:
+        sio.emit("partida_em_andamento", to=sid)
         return
 
     # Validação do limite de 5 jogadores
@@ -84,8 +94,10 @@ def entrar_lobby(sid, data):
     if sid not in estado_jogo["ordem_turnos"]:
         estado_jogo["ordem_turnos"].append(sid)
     
-    # Envia os dados atualizados para todos dentro da mesma sala principal
-    sio.emit("atualizar_lobby", list(estado_jogo["jogadores"].values()), room='sala_principal')
+    # Esta é a lista oficial do lobby; todos recebem exatamente a mesma versão.
+    jogadores_lobby = list(estado_jogo["jogadores"].values())
+    sio.emit("atualizar_lobby", jogadores_lobby, room='sala_principal')
+    sio.emit("entrada_confirmada", {"sid": sid}, to=sid)
 
 @sio.event
 def iniciar_partida(sid):
