@@ -2,8 +2,10 @@ import socketio
 import eventlet
 import time
 import os
+import uuid
 
 sio = socketio.Server(cors_allowed_origins='*')
+SERVER_PROCESS_ID = uuid.uuid4().hex[:6].upper()
 app = socketio.WSGIApp(sio)
 
 # Estado global da sala
@@ -48,7 +50,11 @@ def connect(sid, environ):
     sio.enter_room(sid, 'sala_principal')
 
     # O servidor informa ao cliente qual é sua identidade real no multiplayer.
-    sio.emit("identidade", {"sid": sid}, to=sid)
+    sio.emit("identidade", {
+        "sid": sid,
+        "server_process_id": SERVER_PROCESS_ID,
+        "server_player_count": len(estado_jogo["jogadores"])
+    }, to=sid)
 
     # Um cliente recém-conectado recebe imediatamente o lobby oficial atual.
     sio.emit(
@@ -87,7 +93,11 @@ def entrar_lobby(sid, data):
     jogadores_lobby = list(estado_jogo["jogadores"].values())
     sio.emit("atualizar_lobby", jogadores_lobby, room="sala_principal")
     sio.emit("entrada_confirmada", {"sid": sid}, to=sid)
-    return {"ok": True, "sid": sid, "jogadores": jogadores_lobby}
+    return {
+        "ok": True, "sid": sid, "jogadores": jogadores_lobby,
+        "server_process_id": SERVER_PROCESS_ID,
+        "server_player_count": len(estado_jogo["jogadores"])
+    }
 
 @sio.event
 def sair_lobby(sid):
